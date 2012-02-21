@@ -33,6 +33,8 @@ local function emit(self, line, data, ...)
 	return true
 end
 
+local compile--fwd declare
+
 local function compileFunctionCall(self, resultUsage, list)
 	local firstChild = list[1]
 	local childType, childData, childLine = unpack(firstChild)
@@ -56,7 +58,25 @@ local function compileFunctionCall(self, resultUsage, list)
 	end
 end
 
-local function _compile(self, resultUsage, exp)
+local function locationString(line, pos)
+	return "(line "..line..", pos "..pos..")"
+end
+
+local function compileSpecialForm(self, resultUsage, exp, sf, line, pos)
+	local status, err = pcall(sf, self, resultUsage, exp, line, pos)
+	if not status then--augment the error message and rethrow
+		error(err..locationString(line, pos))
+	else
+		return true
+	end
+end
+
+--compile and expression tree to lua
+--resultUsage: "asParam", "return" or "ignore"
+--return true if succeeded
+--throw an error in case of failure
+--special forms should use this
+compile = function(self, resultUsage, exp)
 	local type, data, line, pos, depth = unpack(exp)
 	--update indentLevel
 	self.indentLevel[line] = self.indentLevel[line] or depth - 1
@@ -70,10 +90,10 @@ local function _compile(self, resultUsage, exp)
 				if sf then--a special form
 					local needLambda = self.lang.wrapWithLambda[childData] --check if the special form need to be surrounded with a lambda
 					if not needLambda or resultUsage ~= "asParam" then
-						return sf(self, resultUsage, data)
+						return compileSpecialForm(self, resultUsage, data, sf, line, pos)
 					else--wrap around a lambda
 						emit(self, childLine, "(function() ")
-						sf(self, "return", data)--tell it to return the value
+						compileSpecialForm(self, "return", data, sf, line, pos)
 						return emit(self, " end)() ")
 					end
 				else--probably a function
@@ -83,7 +103,7 @@ local function _compile(self, resultUsage, exp)
 				return compileFunctionCall(self, resultUsage, data)
 			end
 		else
-			error("Empty list at "..line)
+			error("Empty list "..locationString(line, pos))
 		end
 	elseif type == "Symbol" or type == "Number" then--TODO:separate
 		data = self.lang.aliases[data] or data
@@ -91,8 +111,8 @@ local function _compile(self, resultUsage, exp)
 			return emit(self, line, "return ", data, ';')
 		elseif resultUsage == "asParam" then
 			return emit(self, line, data)
-		else
-			print("Warning: unused symbol "..data.." line "..line.." pos "..pos)
+		else--TODO: put warning somewhere else
+			print("Warning: unused symbol "..data..locationString(line, pos))
 			return true
 		end
 	elseif type == "String" then
@@ -101,16 +121,22 @@ local function _compile(self, resultUsage, exp)
 		elseif resultUsage == "asParam" then
 			emit(self, line, '"', data, '"')
 		else
-			print("Warning: unused string "..data.." line "..line.." pos "..pos)
+			print("Warning: unused string "..data..locationString(line, pos))
 			return true
 		end
 	else
-		error("Unknown type at "..line)
+		error("Unknown type "..type..locationString(line, pos))
 	end
 end
 
-compile = function(self, ...)
-	return _compile(self, ...)
+--same as compile, but return (false, error) instead of throwing
+local function compileSafe(self, resultUsage, exp)
+	local status, result = pcall(compile, self, resultUsage, exp)--TODO: remove lua file info
+	if status then
+		return result
+	else
+		return status, result
+	end
 end
 
 local function generateCode(self)
@@ -126,7 +152,7 @@ local function generateCode(self)
 		for i, str in ipairs(lineContent) do
 			table.insert(code, str)
 		end
-		table.insert(code, "\n")--line break
+		table.insert(code, "\n")
 	end
 	return table.concat(code)
 end
@@ -141,6 +167,7 @@ end
 --export functions
 local Compiler = {
 	compile = compile,
+	compileSafe = compileSafe,
 	emit = emit,
 	generateCode = generateCode,
 	generateUniqueName = generateUniqueName

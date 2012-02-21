@@ -46,10 +46,14 @@ local code = [[
 ]]
 
 local mLisp = require "mLisp"
-local luaCode = mLisp.compileString(code)
-print(luaCode)
-print(loadstring(luaCode))
-
+local luaCode, err = mLisp.toLua(code)
+if luaCode then
+	print(luaCode)
+	print(loadstring(luaCode))
+else
+	print(err)
+end
+print("fib bench--------------")
 local fibLispCode = [[
 (defun fibLisp (n)
 	(if (<= n 2)
@@ -62,7 +66,10 @@ local fibLispCode = [[
 		(loop (+ from 1) to)))
 ]]
 
-local fibLispCode_lua = mLisp.compileString(fibLispCode)
+local fibLispCode_lua, err = mLisp.toLua(fibLispCode)
+if fibLispCode_lua then
+	print(err)
+end
 print(fibLispCode_lua)
 loadstring(fibLispCode_lua)()
 

@@ -103,35 +103,39 @@ function _M.new(inputStream)
 		return string.char(unpack(output))
 	end
 
-	return function()--return token type, token, line, pos
+	local function token(type, lexeme)
+		return type, lexeme, line, pos
+	end
+
+	return function()--return type, lexeme, line, pos
 		local char
 		--skip white spaces
 		repeat
 			char = getChar()--get a character from the input stream
 			if char == 0 then
-				return "EndOfStream"
+				return token("EndOfStream")
 			end
 		until not isWhiteSpace(char)
 
 		if char == LEFT_PAREN then
-			return "LeftParen", "(", line, pos
+			return token("LeftParen", "(")
 
 		elseif char == RIGHT_PAREN then
-			return "RightParen", ")", line, pos
+			return token("RightParen", ")")
 
 		elseif isNum(char) then--number literal
 			--TODO: check for multiple dot
 			local number = tonumber(capture(numberPredicate, {char}))
-			return "Number", number, line, pos
+			return token("Number", number)
 
 		elseif char == DOUBLE_QUOTE then--string literal
 			local str = capture(stringPredicate)
 			getChar()--consume the other DOUBLE_QUOTE
-			return "String", str, line, pos
+			return token("String", str)
 
 		else--symbol
 			local symbol = capture(symbolPredicate, {char})
-			return "Symbol", symbol, line, pos
+			return token("Symbol", symbol)
 		end
 	end
 end
