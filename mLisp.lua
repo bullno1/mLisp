@@ -57,9 +57,19 @@ local function newLineStream()
 	end
 end
 
+local function __index(self, key)
+	local builtin = rawget(LangDef.builtins, key)
+	if builtin then
+		return builtin
+	else
+		return _G[key]
+	end
+end
+
 --A read-eval-print loop
 function _M.repl()
 	local stream, parser, compiler;
+	local env = setmetatable({}, {__index = __index})
 	
 	local function reset()
 		stream = newLineStream()
@@ -83,6 +93,7 @@ function _M.repl()
 					print("--------------------")
 					local func, err = loadstring(code)
 					if func then
+						setfenv(func, env)
 						local status, result = pcall(func)
 						if status then
 							if result ~= nil then

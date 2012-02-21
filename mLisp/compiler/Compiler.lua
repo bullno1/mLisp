@@ -65,7 +65,7 @@ end
 local function compileSpecialForm(self, resultUsage, exp, sf, line, pos)
 	local status, err = pcall(sf, self, resultUsage, exp, line, pos)
 	if not status then--augment the error message and rethrow
-		error(err..locationString(line, pos))
+		error(err..locationString(line, pos))--FIXME:multiple catch and rethrow
 	else
 		return true
 	end

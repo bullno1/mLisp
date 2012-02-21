@@ -35,6 +35,16 @@ local function pow_sf(compiler, resultUsage, list)
 	return compileBinaryOp(compiler, resultUsage, list, "^")
 end
 
+local function concat_sf(compiler, resultUsage, list)
+	assert(#list >= 2, "concat expects at least two arguments")
+	return compileBinaryOp(compiler, resultUsage, list, "..")
+end
+
+local function identity_sf(compiler, resultUsage, list)
+	assert(#list == 2, "identity expects at one arguments")
+	return compiler:compile(resultUsage, list[2])
+end
+
 local function add(first, ...)
 	local acc = first
 	for _, v in ipairs(arg) do
@@ -79,6 +89,14 @@ local function pow(base, power)
 	return base ^ power
 end
 
+local function concat(...)
+	return table.concat(arg)
+end
+
+local function identity(a)
+	return a
+end
+
 return function(def)
 	local mergeTable = LangUtils.mergeTable
 
@@ -95,7 +113,11 @@ return function(def)
 		["/"] = div_sf,
 		["div"] = div_sf,
 
-		["pow"] = pow_sf
+		["pow"] = pow_sf,
+
+		["concat"] = concat_sf,
+
+		["identity"] = identity_sf
 	})
 
 	mergeTable(def.builtins, {
@@ -103,7 +125,9 @@ return function(def)
 		sub = sub,
 		mul = mul,
 		div = div,
-		pow = pow
+		pow = pow,
+		concat = concat,
+		identity = identity_sf
 	})
 
 	mergeTable(def.aliases, {
